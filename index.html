@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Huntrix Piso Wifi - Final Admin Panel</title>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; color: #000; background: #f8f9fa; }
+        
+        /* The Admin Panel Card */
+        .no-print { 
+            background: white; padding: 25px; border: 1.5px solid #000; 
+            margin: 0 auto 30px auto; max-width: 500px; border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        /* Brief Instructions Section */
+        .instructions-box {
+            border: 1px dashed #666;
+            background: #fffcf0;
+            padding: 12px;
+            font-size: 12px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+        }
+
+        .instructions-box strong { color: #d32f2f; }
+
+        /* Actions area */
+        .actions-group { display: flex; flex-direction: column; gap: 12px; }
+        .button-row { display: flex; gap: 10px; }
+
+        /* The Voucher Grid */
+        #voucher-container { 
+            display: grid; 
+            grid-template-columns: repeat(5, 1fr); 
+            gap: 2px; 
+            background: #fff;
+            width: 8.1in;
+            margin: 0 auto;
+        }
+        
+        /* TICKET DESIGN (20% Size Reduced) */
+        .voucher {
+            display: flex;
+            border: 1px solid #000;
+            height: 1.1in;
+            background: white;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .v-body {
+            flex: 2.2;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .v-stub {
+            flex: 1;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-left: 1px dashed #000;
+        }
+
+        /* Labels (h and m abbreviations) */
+        .v-top-info { 
+            font-size: 9.5pt; 
+            font-weight: 700; 
+            font-family: 'Arial Narrow', sans-serif;
+            text-transform: lowercase;
+        }
+
+        /* Reduced Code Box */
+        .v-code-box { 
+            border: 1px solid #000; 
+            margin: 2px 0; 
+            padding: 2px; 
+            text-align: center; 
+            font-size: 13pt; 
+            font-weight: 900;
+        }
+
+        .v-instructions { font-size: 5.5pt; line-height: 1.1; color: #333; }
+        .v-logo { width: 100%; max-width: 50px; filter: grayscale(1); }
+        .v-brand-name { font-size: 5pt; font-weight: bold; text-align: center; line-height: 1; margin-top: 2px;}
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; padding: 0; }
+            #voucher-container { gap: 1px; }
+            @page { size: 8.5in 13in; margin: 0.2in; }
+        }
+
+        /* Custom Button Styles */
+        .btn { padding: 12px; cursor: pointer; font-weight: bold; border-radius: 6px; border: 1px solid #000; flex: 1; transition: 0.2s; }
+        .btn-preview { background: #f0f0f0; color: #000; }
+        .btn-print { background: #000; color: #fff; }
+        .btn-print:disabled { background: #ccc; border-color: #ccc; cursor: not-allowed; }
+        .btn:hover:not(:disabled) { opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+<div class="no-print">
+    <h1 style="margin: 0 0 15px 0; font-size: 24px;">Huntrix Admin Panel</h1>
+    
+    <div class="instructions-box">
+        <strong>EXCEL DATA FORMAT:</strong><br>
+        1. Mandatory Headers: <b>Code</b>, <b>Price</b>, <b>Time</b>.<br>
+        2. Format "Time" as: <b>3h</b> (3 hours) or <b>30m</b> (30 minutes).<br>
+        3. Ensure spelling matches exactly.
+    </div>
+
+    <div class="actions-group">
+        <div style="font-size: 14px; margin-bottom: 5px;">Data Sheet (Required)</div>
+        <input type="file" id="fileInput" accept=".xlsx, .xls" />
+        
+        <div class="button-row">
+            <button class="btn btn-preview" onclick="generatePreview()">Preview</button>
+            <button class="btn btn-print" id="printBtn" onclick="window.print()" disabled>Print</button>
+        </div>
+    </div>
+</div>
+
+<div id="voucher-container"></div>
+
+<script>
+    let rows = [];
+
+    // Formatter for abbreviations
+    function formatTime(val) {
+        if (!val) return "";
+        let str = val.toString().toLowerCase();
+        if (str.includes('hour')) return str.replace('hours', 'h').replace('hour', 'h');
+        if (str.includes('minute')) return str.replace('minutes', 'm').replace('minute', 'm');
+        return str; 
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const data = new Uint8Array(event.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function generatePreview() {
+        const container = document.getElementById('voucher-container');
+        container.innerHTML = ''; 
+        if(rows.length === 0) return alert("Please choose an Excel file first.");
+
+        rows.forEach(row => {
+            const v = document.createElement('div');
+            v.className = 'voucher';
+            v.innerHTML = `
+                <div class="v-body">
+                    <div class="v-top-info">
+                        ₱${row.Price || '0'} / ${formatTime(row.Time)}
+                    </div>
+                    <div class="v-code-box">${row.Code || '------'}</div>
+                    <div class="v-instructions">
+                        Connect to "Huntrix Wifi" > Go to 10.0.0.1 > Enter code.
+                    </div>
+                </div>
+                <div class="v-stub">
+                    <img src="huntrix_logo.png" class="v-logo" onerror="this.style.display='none'">
+                    <div class="v-brand-name">HUNTRIX<br>PISO WIFI</div>
+                </div>
+            `;
+            container.appendChild(v);
+        });
+        document.getElementById('printBtn').disabled = false;
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+</script>
+
+</body>
+</html>
